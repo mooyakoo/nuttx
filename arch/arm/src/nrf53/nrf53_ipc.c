@@ -157,7 +157,7 @@ void nrf53_ipc_signal(int id)
    * be changed at runtime.
    */
 
-  putreg32(1, 0x4002a000u + NRF53_IPC_TASKS_SEND_OFFSET(id));
+  putreg32(1, NRF53_IPC_NS_BASE + NRF53_IPC_TASKS_SEND_OFFSET(id));
 #else
   putreg32(1, NRF53_IPC_TASKS_SEND(id));
 #endif

@@ -95,6 +95,7 @@
 #define NRF53_PDM0_BASE         0x50026000
 #define NRF53_I2S0_BASE         0x50028000
 #define NRF53_IPC_BASE          0x5002A000
+#define NRF53_IPC_NS_BASE       0x4002A000  /* NonSecure alias; required for TASKS_SEND to propagate cross-core (nRF5340 PS §4.8.3) */
 #define NRF53_QSPI_BASE         0x5002B000
 #define NRF53_NFCT_BASE         0x5002D000
 #define NRF53_GPIOTE1_BASE      0x4002F000
