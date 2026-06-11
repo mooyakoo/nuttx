@@ -20,9 +20,19 @@
  *
  ****************************************************************************/
 
+#include <nuttx/config.h>
+
+#ifdef CONFIG_NRF52840_DONGLE_OPEN_BOOTLOADER
+#  define FLASH_START_ADDR 0x00001000
+#  define FLASH_LENGTH     0xdf000
+#else
+#  define FLASH_START_ADDR 0x00000000
+#  define FLASH_LENGTH     1024K
+#endif
+
 MEMORY
 {
-    progmem (rx)  : ORIGIN = 0x00000000, LENGTH = 1024K
+    progmem (rx)  : ORIGIN = FLASH_START_ADDR, LENGTH = FLASH_LENGTH
     datamem (rwx) : ORIGIN = 0x20000000, LENGTH = 256K
 }
 

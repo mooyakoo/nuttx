@@ -26,6 +26,7 @@
 
 #include <assert.h>
 #include <debug.h>
+#include <stdbool.h>
 #include <stdlib.h>
 
 #include <nuttx/net/bluetooth.h>
@@ -47,6 +48,20 @@
 #include <sdc.h>
 #include <sdc_hci.h>
 #include <sdc_soc.h>
+
+#ifdef CONFIG_NIMBLE
+struct ble_hci_ev;
+struct os_mbuf;
+void *ble_transport_alloc_evt(int discardable);
+struct os_mbuf *ble_transport_alloc_acl_from_ll(void);
+int ble_hs_hci_evt_process(struct ble_hci_ev *ev);
+int ble_transport_to_hs_evt_impl(void *buf);
+int ble_transport_to_hs_acl_impl(struct os_mbuf *om);
+void ble_transport_free(void *buf);
+int os_mbuf_append(struct os_mbuf *om, const void *data, uint16_t len);
+void os_mbuf_free_chain(struct os_mbuf *om);
+void ble_hs_process_rx_data_queue(void);
+#endif
 
 /****************************************************************************
  * Pre-processor Definitions
@@ -182,7 +197,8 @@ struct nrf52_sdc_dev_s
   uint8_t msg_buffer[HCI_MSG_BUFFER_MAX_SIZE];
 
   mutex_t lock;
-  struct work_s work;
+  struct work_s hci_work;
+  struct work_s low_work;
 };
 
 begin_packed_struct struct sdc_hci_cmd_vs_zephyr_write_bd_addr_s
@@ -220,6 +236,9 @@ static void on_hci(void);
 static void on_hci_worker(void *arg);
 
 static void low_prio_worker(void *arg);
+#ifdef CONFIG_NIMBLE
+static void process_nimble_acl_pending(void);
+#endif
 
 static int swi_isr(int irq, void *context, void *arg);
 static int power_clock_isr(int irq, void *context, void *arg);
@@ -238,6 +257,10 @@ static struct bt_driver_s g_bt_driver =
   .open         = bt_open,
   .send         = bt_hci_send
 };
+
+#ifdef CONFIG_NIMBLE
+static volatile bool g_nimble_acl_pending;
+#endif
 
 static const mpsl_clock_lfclk_cfg_t g_clock_config =
 {
@@ -306,7 +329,15 @@ static int bt_hci_send(struct bt_driver_s *btdev,
         {
           ret = len;
 
-          work_queue(LPWORK, &g_sdc_dev.work, on_hci_worker, NULL, 0);
+          nxmutex_lock(&g_sdc_dev.lock);
+          on_hci();
+          nxmutex_unlock(&g_sdc_dev.lock);
+#ifdef CONFIG_NIMBLE
+          process_nimble_acl_pending();
+#endif
+
+          work_queue(LPWORK, &g_sdc_dev.hci_work, on_hci_worker,
+                     NULL, 0);
         }
     }
 
@@ -360,7 +391,25 @@ static void on_hci_worker(void *arg)
   nxmutex_lock(&g_sdc_dev.lock);
   on_hci();
   nxmutex_unlock(&g_sdc_dev.lock);
+#ifdef CONFIG_NIMBLE
+  process_nimble_acl_pending();
+#endif
 }
+
+#ifdef CONFIG_NIMBLE
+/****************************************************************************
+ * Name: process_nimble_acl_pending
+ ****************************************************************************/
+
+static void process_nimble_acl_pending(void)
+{
+  if (g_nimble_acl_pending)
+    {
+      g_nimble_acl_pending = false;
+      ble_hs_process_rx_data_queue();
+    }
+}
+#endif
 
 /****************************************************************************
  * Name: on_hci
@@ -410,8 +459,38 @@ static void on_hci(void)
                 }
 #endif
 
+#ifdef CONFIG_NIMBLE
+              {
+                void *evbuf;
+
+                evbuf = ble_transport_alloc_evt(0);
+                if (evbuf != NULL)
+                  {
+                    memcpy(evbuf, g_sdc_dev.msg_buffer, len);
+                    if (hdr->evt == BT_HCI_EVT_CMD_COMPLETE ||
+                        hdr->evt == BT_HCI_EVT_CMD_STATUS)
+                      {
+                        ret = ble_transport_to_hs_evt_impl(evbuf);
+                      }
+                    else
+                      {
+                        nxmutex_unlock(&g_sdc_dev.lock);
+                        ret = ble_hs_hci_evt_process(evbuf);
+                        nxmutex_lock(&g_sdc_dev.lock);
+                      }
+
+                    if (ret != 0 &&
+                        (hdr->evt == BT_HCI_EVT_CMD_COMPLETE ||
+                         hdr->evt == BT_HCI_EVT_CMD_STATUS))
+                      {
+                        ble_transport_free(evbuf);
+                      }
+                  }
+              }
+#else
               bt_netdev_receive(&g_bt_driver, BT_EVT,
                                 g_sdc_dev.msg_buffer, len);
+#endif
               check_again = true;
             }
 
@@ -425,8 +504,36 @@ static void on_hci(void)
 
               len = sizeof(*hdr) + hdr->len;
 
+#ifdef CONFIG_NIMBLE
+              {
+                struct os_mbuf *om;
+
+                om = ble_transport_alloc_acl_from_ll();
+                if (om != NULL)
+                  {
+                    ret = os_mbuf_append(om, g_sdc_dev.msg_buffer, len);
+                    if (ret == 0)
+                      {
+                        ret = ble_transport_to_hs_acl_impl(om);
+                        if (ret != 0)
+                          {
+                            os_mbuf_free_chain(om);
+                          }
+                        else
+                          {
+                            g_nimble_acl_pending = true;
+                          }
+                      }
+                    else
+                      {
+                        os_mbuf_free_chain(om);
+                      }
+                  }
+              }
+#else
               bt_netdev_receive(&g_bt_driver, BT_ACL_IN,
                                 g_sdc_dev.msg_buffer, len);
+#endif
               check_again = true;
             }
         }
@@ -440,7 +547,7 @@ static void on_hci(void)
 
 static int swi_isr(int irq, void *context, void *arg)
 {
-  work_queue(LPWORK, &g_sdc_dev.work, low_prio_worker, NULL, 0);
+  work_queue(LPWORK, &g_sdc_dev.low_work, low_prio_worker, NULL, 0);
 
   return 0;
 }
@@ -923,3 +1030,18 @@ int nrf52_sdc_initialize(void)
 
   return ret;
 }
+
+/****************************************************************************
+ * Name: nrf52_sdc_poll
+ ****************************************************************************/
+
+#ifdef CONFIG_NIMBLE
+void nrf52_sdc_poll(void)
+{
+  nxmutex_lock(&g_sdc_dev.lock);
+  on_hci();
+  nxmutex_unlock(&g_sdc_dev.lock);
+  process_nimble_acl_pending();
+
+}
+#endif

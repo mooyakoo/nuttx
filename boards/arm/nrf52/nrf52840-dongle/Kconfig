@@ -3,6 +3,14 @@
 # see the file kconfig-language.txt in the NuttX tools repository.
 #
 
-if ARCH_BOARD_NRF52840_DK
+if ARCH_BOARD_NRF52840_DONGLE
+
+config NRF52840_DONGLE_OPEN_BOOTLOADER
+	bool "Use Nordic Open Bootloader application offset"
+	default n
+	---help---
+		Link the application for the Nordic nRF52840 Dongle USB Open
+		Bootloader layout. This reserves the MBR page at 0x00000000 and
+		starts the application at 0x00001000 for USB DFU packages.
 
 endif

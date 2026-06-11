@@ -296,6 +296,27 @@ static ssize_t bluetooth_sendto(FAR struct socket *psock,
       return -EOPNOTSUPP;
     }
 
+  if (psock->s_proto == BTPROTO_HCI)
+    {
+      struct devif_callback_s cb;
+      FAR struct sockaddr_hci *destaddr = (FAR struct sockaddr_hci *)to;
+
+      memset(&state, 0, sizeof(struct bluetooth_sendto_s));
+      memset(&cb, 0, sizeof(cb));
+      nxsem_init(&state.is_sem, 0, 0);
+
+      state.is_sock = psock;
+      state.is_buflen = len;
+      state.is_buffer = buf;
+      state.is_channel = destaddr->hci_channel;
+      state.is_cb = &cb;
+
+      bluetooth_sendto_eventhandler(&radio->r_dev, &state, BLUETOOTH_POLL);
+      nxsem_destroy(&state.is_sem);
+
+      return state.is_sent;
+    }
+
   /* Perform the send operation */
 
   /* Initialize the state structure. This is done with the network locked
