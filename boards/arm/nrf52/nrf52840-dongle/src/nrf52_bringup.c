@@ -37,6 +37,10 @@
 #  include "nrf52_ieee802154.h"
 #endif
 
+#ifdef CONFIG_NRF52_SOFTDEVICE_CONTROLLER
+#  include "nrf52_sdc.h"
+#endif
+
 /****************************************************************************
  * Public Functions
  ****************************************************************************/
@@ -86,6 +90,14 @@ int nrf52_bringup(void)
     {
       syslog(LOG_ERR, "ERROR: Failed to initialize IEE802154 radio: %d\n",
              ret);
+    }
+#endif
+
+#ifdef CONFIG_NRF52_SOFTDEVICE_CONTROLLER
+  ret = nrf52_sdc_initialize();
+  if (ret < 0)
+    {
+      syslog(LOG_ERR, "ERROR: nrf52_sdc_initialize() failed: %d\n", ret);
     }
 #endif
 

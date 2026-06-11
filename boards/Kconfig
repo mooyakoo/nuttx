@@ -3939,6 +3939,9 @@ endif
 if ARCH_BOARD_NRF52840_DK
 source "boards/arm/nrf52/nrf52840-dk/Kconfig"
 endif
+if ARCH_BOARD_NRF52840_DONGLE
+source "boards/arm/nrf52/nrf52840-dongle/Kconfig"
+endif
 if ARCH_BOARD_THINGY52
 source "boards/arm/nrf52/thingy52/Kconfig"
 endif
