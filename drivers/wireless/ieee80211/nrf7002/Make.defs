@@ -1,0 +1,184 @@
+############################################################################
+# drivers/wireless/ieee80211/nrf7002/Make.defs
+#
+# SPDX-License-Identifier: Apache-2.0
+#
+# Licensed to the Apache Software Foundation (ASF) under one or more
+# contributor license agreements.  See the NOTICE file distributed with
+# this work for additional information regarding copyright ownership.  The
+# ASF licenses this file to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance with the
+# License.  You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+# WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.  See the
+# License for the specific language governing permissions and limitations
+# under the License.
+#
+############################################################################
+
+ifeq ($(CONFIG_IEEE80211_NRF7002),y)
+
+  # NuttX OSAL shim and driver files
+
+  CSRCS += nrf7002_osal.c
+  CSRCS += nrf7002_bus_qspi.c
+  CSRCS += nrf7002_driver.c
+  CSRCS += nrf7002_netdev.c
+  CSRCS += nrf7002_wpa.c
+
+  # RPU firmware blob (Nordic-proprietary, not distributed here).  The driver
+  # references g_nrf70_fw_patch[] / g_nrf70_fw_patch_len, which are defined in
+  # the generated, git-ignored nrf7002_fw_blob.c.  Build it only if present so
+  # a missing firmware produces a clear link error rather than a build break of
+  # the whole tree.  See ncs/README.md for how to generate it.
+
+  ifneq ($(wildcard $(TOPDIR)/drivers/wireless/ieee80211/nrf7002/nrf7002_fw_blob.c),)
+    CSRCS += nrf7002_fw_blob.c
+  endif
+
+  # NCS nrf_wifi firmware-stack source files (OS-agnostic C, no Zephyr deps).
+  # These are vendored in-tree under this directory (BSD-3-Clause, Nordic) with
+  # the headers under ncs/; see ncs/README for provenance.
+
+  # OSAL and bus layer
+  CSRCS += ncs_osal.c
+  CSRCS += ncs_bal.c
+  CSRCS += ncs_qspi.c
+
+  # HAL layer (common + system)
+  CSRCS += ncs_hal_api_common.c
+  CSRCS += ncs_hal_api.c
+  CSRCS += ncs_hal_fw_patch_loader.c
+  CSRCS += ncs_hal_interrupt.c
+  CSRCS += ncs_hal_mem.c
+  CSRCS += ncs_hal_reg.c
+  CSRCS += ncs_hpqm.c
+  CSRCS += ncs_pal.c
+
+  # FMAC layer (common + system)
+  CSRCS += ncs_fmac_api.c
+  CSRCS += ncs_fmac_api_common.c
+  CSRCS += ncs_fmac_cmd.c
+  CSRCS += ncs_fmac_cmd_common.c
+  CSRCS += ncs_fmac_event.c
+  CSRCS += ncs_fmac_util.c
+  CSRCS += ncs_fmac_peer.c
+  # ncs_fmac_promisc.c requires NRF70_PROMISC_DATA_RX - skip for Phase 1
+  CSRCS += ncs_fmac_vif.c
+  CSRCS += ncs_fmac_ap.c
+  CSRCS += ncs_rx.c
+  CSRCS += ncs_tx.c
+
+  # Utils
+  CSRCS += ncs_list.c
+  CSRCS += ncs_queue.c
+  CSRCS += ncs_util.c
+
+  # Shim headers that satisfy NCS linux/* includes under NuttX.
+  # Must appear BEFORE the NCS include paths so our stubs shadow
+  # the real Linux headers that don't exist in NuttX.
+  # NCS code tests __KERNEL__ and falls into the Linux kernel path;
+  # our stubs redirect to standard C headers.
+
+  NRF7002_DRV := $(TOPDIR)/drivers/wireless/ieee80211/nrf7002
+  CFLAGS += -I$(NRF7002_DRV)/include
+
+  # Include paths for the vendored NCS nrf_wifi headers (in-tree, ncs/)
+
+  NCS_WIFI := $(NRF7002_DRV)/ncs
+  CFLAGS += -I$(NCS_WIFI)/os_if/inc
+  CFLAGS += -I$(NCS_WIFI)/fw_if/umac_if/inc
+  CFLAGS += -I$(NCS_WIFI)/fw_if/umac_if/inc/system
+  CFLAGS += -I$(NCS_WIFI)/fw_if/umac_if/inc/common
+  CFLAGS += -I$(NCS_WIFI)/fw_if/umac_if/inc/fw
+  CFLAGS += -I$(NCS_WIFI)/hw_if/hal/inc
+  CFLAGS += -I$(NCS_WIFI)/hw_if/hal/inc/common
+  CFLAGS += -I$(NCS_WIFI)/bus_if/bal/inc
+  CFLAGS += -I$(NCS_WIFI)/bus_if/bus/qspi/inc
+  CFLAGS += -I$(NCS_WIFI)/utils/inc
+
+  # NCS feature flags (mirrored from NCS Makefile ccflags)
+  # These must match what the NCS firmware stack expects at compile time.
+  # Override NRF_WIFI_LOW_POWER to 0 to disable PS (simpler bringup).
+
+  CFLAGS += -DNRF70_SYSTEM_MODE
+  CFLAGS += -DNRF70_STA_MODE
+  CFLAGS += -DNRF70_DATA_TX
+  CFLAGS += -DNRF70_UTIL
+  CFLAGS += -DNRF70_TCP_IP_CHECKSUM_OFFLOAD
+  CFLAGS += -DNRF70_RPU_EXTEND_TWT_SP
+  CFLAGS += -DNRF_WIFI_MGMT_BUFF_OFFLOAD
+  CFLAGS += -DNRF_WIFI_FEAT_KEEPALIVE
+  CFLAGS += -DNRF_WIFI_KEEPALIVE_PERIOD_S=60
+  CFLAGS += -DNRF_WIFI_AP_DEAD_DETECT_TIMEOUT=20
+  CFLAGS += -DNRF_WIFI_IFACE_MTU=1500
+  CFLAGS += -DNRF_WIFI_PS_INT_PS
+  CFLAGS += -DNRF_WIFI_RPU_RECOVERY
+  CFLAGS += -DNRF_WIFI_RPU_RECOVERY_PS_ACTIVE_TIMEOUT_MS=50000
+  CFLAGS += -DNRF_WIFI_DISPLAY_SCAN_BSS_LIMIT=150
+  CFLAGS += -DNRF_WIFI_RPU_MIN_TIME_TO_ENTER_SLEEP_MS=1000
+  CFLAGS += -DWIFI_NRF70_LOG_LEVEL=1  # ERR only — verbose logging stalls TX/RX
+  # NRF_WIFI_LOW_POWER intentionally NOT defined — we want PS disabled
+  # (defining it even as 0 still triggers #ifdef NRF_WIFI_LOW_POWER)
+  CFLAGS += -DNRF_WIFI_MAX_PS_POLL_FAIL_CNT=10
+  CFLAGS += -DNRF_WIFI_PS_INT_PS=0
+  CFLAGS += -DNRF_WIFI_RPU_RECOVERY_PS_ACTIVE_TIMEOUT_MS=50000
+  CFLAGS += -DNRF_WIFI_DISPLAY_SCAN_BSS_LIMIT=150
+  CFLAGS += -DNRF_WIFI_RPU_MIN_TIME_TO_ENTER_SLEEP_MS=1000
+  CFLAGS += -DNRF70_RPU_PS_IDLE_TIMEOUT_MS=10
+  CFLAGS += -DNRF70_RX_NUM_BUFS=4
+  CFLAGS += -DNRF70_MAX_TX_TOKENS=12
+  # Must match the NCS/Zephyr reference default (Kconfig.nrfwifi default 1600).
+  # The RPU firmware writes up to this many bytes into each host RX buffer; an
+  # undersized value (was 1520) lets a max-size aggregated RX frame overrun the
+  # nbuf by ~20 bytes and corrupt the kmm heap (only triggered under TCP bulk
+  # RX, where large A-MSDU frames occur; UDP/ping use small frames).
+  CFLAGS += -DNRF70_RX_MAX_DATA_SIZE=1600
+  # NCS/Zephyr reference default is 18.  A shallow pending queue (was 4) fills
+  # before FMAC can build a max_tx_aggregation (12) burst, so the second frame
+  # per poll gets rejected (start_xmit busy) and TX throughput is throttled to
+  # ~1 frame/tick.  Raise to the reference 18 to let FMAC aggregate.
+  CFLAGS += -DNRF70_MAX_TX_PENDING_QLEN=18
+  CFLAGS += -DNRF70_BAND_2G_LOWER_EDGE_BACKOFF_DSSS=0
+  CFLAGS += -DNRF70_BAND_2G_LOWER_EDGE_BACKOFF_HT=0
+  CFLAGS += -DNRF70_BAND_2G_LOWER_EDGE_BACKOFF_HE=0
+  CFLAGS += -DNRF70_BAND_2G_UPPER_EDGE_BACKOFF_DSSS=0
+  CFLAGS += -DNRF70_BAND_2G_UPPER_EDGE_BACKOFF_HT=0
+  CFLAGS += -DNRF70_BAND_2G_UPPER_EDGE_BACKOFF_HE=0
+  CFLAGS += -DNRF70_BAND_UNII_1_LOWER_EDGE_BACKOFF_HT=0
+  CFLAGS += -DNRF70_BAND_UNII_1_LOWER_EDGE_BACKOFF_HE=0
+  CFLAGS += -DNRF70_BAND_UNII_1_UPPER_EDGE_BACKOFF_HT=0
+  CFLAGS += -DNRF70_BAND_UNII_1_UPPER_EDGE_BACKOFF_HE=0
+  CFLAGS += -DNRF70_BAND_UNII_2A_LOWER_EDGE_BACKOFF_HT=0
+  CFLAGS += -DNRF70_BAND_UNII_2A_LOWER_EDGE_BACKOFF_HE=0
+  CFLAGS += -DNRF70_BAND_UNII_2A_UPPER_EDGE_BACKOFF_HT=0
+  CFLAGS += -DNRF70_BAND_UNII_2A_UPPER_EDGE_BACKOFF_HE=0
+  CFLAGS += -DNRF70_BAND_UNII_2C_LOWER_EDGE_BACKOFF_HT=0
+  CFLAGS += -DNRF70_BAND_UNII_2C_LOWER_EDGE_BACKOFF_HE=0
+  CFLAGS += -DNRF70_BAND_UNII_2C_UPPER_EDGE_BACKOFF_HT=0
+  CFLAGS += -DNRF70_BAND_UNII_2C_UPPER_EDGE_BACKOFF_HE=0
+  CFLAGS += -DNRF70_BAND_UNII_3_LOWER_EDGE_BACKOFF_HT=0
+  CFLAGS += -DNRF70_BAND_UNII_3_LOWER_EDGE_BACKOFF_HE=0
+  CFLAGS += -DNRF70_BAND_UNII_3_UPPER_EDGE_BACKOFF_HT=0
+  CFLAGS += -DNRF70_BAND_UNII_3_UPPER_EDGE_BACKOFF_HE=0
+  CFLAGS += -DNRF70_BAND_UNII_4_LOWER_EDGE_BACKOFF_HT=0
+  CFLAGS += -DNRF70_BAND_UNII_4_LOWER_EDGE_BACKOFF_HE=0
+  CFLAGS += -DNRF70_BAND_UNII_4_UPPER_EDGE_BACKOFF_HT=0
+  CFLAGS += -DNRF70_BAND_UNII_4_UPPER_EDGE_BACKOFF_HE=0
+  CFLAGS += -DNRF70_PCB_LOSS_2G=0
+  CFLAGS += -DNRF70_PCB_LOSS_5G_BAND1=0
+  CFLAGS += -DNRF70_PCB_LOSS_5G_BAND2=0
+  CFLAGS += -DNRF70_PCB_LOSS_5G_BAND3=0
+  CFLAGS += -DNRF70_ANT_GAIN_2G=0
+  CFLAGS += -DNRF70_ANT_GAIN_5G_BAND1=0
+  CFLAGS += -DNRF70_ANT_GAIN_5G_BAND2=0
+  CFLAGS += -DNRF70_ANT_GAIN_5G_BAND3=0
+
+  DEPPATH += --dep-path wireless/ieee80211/nrf7002
+  VPATH   += :wireless/ieee80211/nrf7002
+
+endif # CONFIG_IEEE80211_NRF7002

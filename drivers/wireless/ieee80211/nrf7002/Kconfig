@@ -1,0 +1,36 @@
+#
+# drivers/wireless/ieee80211/nrf7002/Kconfig
+#
+# SPDX-License-Identifier: Apache-2.0
+#
+
+config IEEE80211_NRF7002
+	bool "Nordic nRF7002 WiFi driver"
+	depends on NRF53_QSPI
+	default n
+	---help---
+	  Enable the nRF7002 IEEE 802.11 WiFi driver.
+
+	  The nRF7002 is a companion WiFi chip connected to the nRF5340
+	  application core via QSPI.  This driver bridges the Nordic NCS
+	  nrf_wifi FMAC firmware stack (vendored in-tree under ncs/) to NuttX
+	  via an OSAL shim.
+
+	  Requires CONFIG_NRF53_QSPI=y and CONFIG_SCHED_HPWORK=y.
+
+if IEEE80211_NRF7002
+
+config IEEE80211_NRF7002_AP_MODE
+	bool "Enable nRF7002 SoftAP mode"
+	depends on IEEE80211_NRF7002
+	default n
+	---help---
+	  Enable SoftAP (Access Point) mode support for the nRF7002 driver.
+
+	  When enabled, the driver will respond to SIOCSIWMODE IOCTL with
+	  IW_MODE_MASTER and can start a SoftAP via nrf_wifi_sys_fmac_start_ap.
+
+	  Requires NRF70_SYSTEM_WITH_RAW_MODES or equivalent build-time define
+	  in the NCS SDK.
+
+endif # IEEE80211_NRF7002
