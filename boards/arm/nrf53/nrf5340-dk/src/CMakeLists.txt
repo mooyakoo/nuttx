@@ -60,6 +60,10 @@ if(CONFIG_NRF53_QSPI)
   list(APPEND SRCS nrf53_mx25.c)
 endif()
 
+if(CONFIG_IEEE80211_NRF7002)
+  list(APPEND SRCS nrf53_nrf7002.c)
+endif()
+
 target_sources(board PRIVATE ${SRCS})
 
 if(CONFIG_ARCH_BOARD_COMMON)

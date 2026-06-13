@@ -179,4 +179,21 @@
 #define NRF53_QSPI0_IO3_PIN (GPIO_MCUSEL_PERIP | GPIO_OUTPUT | \
                              GPIO_PORT0 | GPIO_PIN(16))
 
+/* nRF7002 WiFi control GPIO (nRF7002-DK PCA10143) ***************************
+ *
+ * BUCKEN  P0.12 — output, initially low: enable nRF7002 DCDC buck regulator
+ * IOVDD   P0.31 — output, initially low: enable nRF7002 IO voltage domain
+ *                 NOTE: conflicts with LED4 on nRF5340-DK; set
+ *                 CONFIG_ARCH_LEDS=n in wifi_cpuapp/defconfig.
+ * HOSTIRQ P0.23 — input: nRF7002 → nRF5340 interrupt line (rising edge)
+ *                 NOTE: P0.23 is also BUTTON1 on the nRF5340-DK.
+ */
+
+#define NRF7002_BUCKEN_PIN  (GPIO_MCUSEL_APP | GPIO_OUTPUT | \
+                             GPIO_VALUE_ZERO | GPIO_PORT0 | GPIO_PIN(12))
+#define NRF7002_IOVDD_PIN   (GPIO_MCUSEL_APP | GPIO_OUTPUT | \
+                             GPIO_VALUE_ZERO | GPIO_PORT0 | GPIO_PIN(31))
+#define NRF7002_HOSTIRQ_PIN (GPIO_MCUSEL_APP | GPIO_INPUT  | \
+                             GPIO_SENSE_HIGH | GPIO_PORT0 | GPIO_PIN(23))
+
 #endif /* __BOARDS_ARM_NRF53_NRF5340_DK_INCLUDE_BOARD_H */

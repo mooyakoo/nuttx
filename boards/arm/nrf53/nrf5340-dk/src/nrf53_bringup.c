@@ -278,8 +278,16 @@ int nrf53_bringup(void)
   usbdev_rndis_initialize(mac);
 #endif
 
-#ifdef CONFIG_NRF53_QSPI
-  /* Initialize the MX25 QSPU memory */
+#if defined(CONFIG_NRF53_QSPI) && !defined(CONFIG_IEEE80211_NRF7002)
+  /* Initialize the MX25 QSPI memory.
+   *
+   * NOTE: When CONFIG_IEEE80211_NRF7002 is enabled we skip this because:
+   *  (a) the nRF7002 WiFi chip also uses the single QSPI peripheral, and
+   *  (b) calling nrf53_qspi_initialize(0) here configures the QSPI hardware
+   *      with the MX25 CS pin (P0.18) which then conflicts with the nRF7002
+   *      CS pin used by the nrf7002 driver.
+   * If both MX25 and nRF7002 are needed, a dual-CS QSPI driver is required.
+   */
 
   ret = nrf53_mx25_initialize();
   if (ret < 0)
@@ -311,6 +319,16 @@ int nrf53_bringup(void)
       syslog(LOG_ERR, "ERROR: Failed to initialize MTD progmem: %d\n", ret);
     }
 #endif /* CONFIG_MTD */
+
+#ifdef CONFIG_IEEE80211_NRF7002
+  /* Initialize the nRF7002 WiFi companion chip */
+
+  ret = nrf53_nrf7002_initialize();
+  if (ret < 0)
+    {
+      syslog(LOG_ERR, "ERROR: nrf53_nrf7002_initialize() failed: %d\n", ret);
+    }
+#endif /* CONFIG_IEEE80211_NRF7002 */
 
   UNUSED(ret);
   return OK;

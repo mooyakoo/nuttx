@@ -58,7 +58,29 @@ ifeq ($(CONFIG_USBDEV_COMPOSITE),y)
 CSRCS += nrf53_composite.c
 endif
 
-ifeq ($(CONFIG_NRF53_QSPI),y)
+ifeq ($(CONFIG_IEEE80211_NRF7002),y)
+# The nRF7002 and the MX25 flash share the single QSPI peripheral; build the
+# nRF7002 board glue instead of the MX25 init when the WiFi driver is enabled.
+CSRCS += nrf53_nrf7002.c
+# The board glue includes the driver's nrf7002_driver.h, which in turn pulls in
+# the vendored NCS nrf_wifi headers (fmac_structs.h, etc).  The driver's own
+# Make.defs adds these -I flags only for its own directory, so mirror the set
+# the board source needs here.
+NRF7002_DRV := $(TOPDIR)$(DELIM)drivers$(DELIM)wireless$(DELIM)ieee80211$(DELIM)nrf7002
+NRF7002_NCS := $(NRF7002_DRV)$(DELIM)ncs
+CFLAGS += ${INCDIR_PREFIX}$(NRF7002_DRV)
+CFLAGS += ${INCDIR_PREFIX}$(NRF7002_DRV)$(DELIM)include
+CFLAGS += ${INCDIR_PREFIX}$(NRF7002_NCS)$(DELIM)os_if$(DELIM)inc
+CFLAGS += ${INCDIR_PREFIX}$(NRF7002_NCS)$(DELIM)fw_if$(DELIM)umac_if$(DELIM)inc
+CFLAGS += ${INCDIR_PREFIX}$(NRF7002_NCS)$(DELIM)fw_if$(DELIM)umac_if$(DELIM)inc$(DELIM)system
+CFLAGS += ${INCDIR_PREFIX}$(NRF7002_NCS)$(DELIM)fw_if$(DELIM)umac_if$(DELIM)inc$(DELIM)common
+CFLAGS += ${INCDIR_PREFIX}$(NRF7002_NCS)$(DELIM)fw_if$(DELIM)umac_if$(DELIM)inc$(DELIM)fw
+CFLAGS += ${INCDIR_PREFIX}$(NRF7002_NCS)$(DELIM)hw_if$(DELIM)hal$(DELIM)inc
+CFLAGS += ${INCDIR_PREFIX}$(NRF7002_NCS)$(DELIM)hw_if$(DELIM)hal$(DELIM)inc$(DELIM)common
+CFLAGS += ${INCDIR_PREFIX}$(NRF7002_NCS)$(DELIM)bus_if$(DELIM)bal$(DELIM)inc
+CFLAGS += ${INCDIR_PREFIX}$(NRF7002_NCS)$(DELIM)bus_if$(DELIM)bus$(DELIM)qspi$(DELIM)inc
+CFLAGS += ${INCDIR_PREFIX}$(NRF7002_NCS)$(DELIM)utils$(DELIM)inc
+else ifeq ($(CONFIG_NRF53_QSPI),y)
 CSRCS += nrf53_mx25.c
 endif
 

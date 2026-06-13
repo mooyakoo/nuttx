@@ -132,5 +132,18 @@ int nrf53_adc_setup(void);
 int nrf53_mx25_initialize(void);
 #endif
 
+/****************************************************************************
+ * Name: nrf53_nrf7002_initialize
+ *
+ * Description:
+ *   Board-level initialization for the nRF7002 WiFi companion chip:
+ *   GPIO power-up sequence, QSPI binding, and driver init.
+ *
+ ****************************************************************************/
+
+#ifdef CONFIG_IEEE80211_NRF7002
+int nrf53_nrf7002_initialize(void);
+#endif
+
 #endif /* __ASSEMBLY__ */
 #endif /* __BOARDS_ARM_NRF53_NRF5340_DK_SRC_NRF5340_DK_H */
